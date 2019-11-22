@@ -4,6 +4,8 @@ go 1.12
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.3.3
+	github.com/bxcodec/faker v2.0.1+incompatible
+	github.com/bxcodec/faker/v3 v3.2.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.3

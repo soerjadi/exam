@@ -32,10 +32,9 @@ type OrderHandler struct {
 var logger = utils.LogBuilder(true)
 
 // NewOrderHandler initialize product resource endpoint
-func NewOrderHandler(router *mux.Router, usecase order.Usecase, priceUsecase price.Usecase, productUsecase product.Usecase) *mux.Router {
+func NewOrderHandler(router *mux.Router, usecase order.Usecase, productUsecase product.Usecase) *mux.Router {
 	handler := &OrderHandler{
 		OrderUsecase:   usecase,
-		PriceUsecase:   priceUsecase,
 		ProductUsecase: productUsecase,
 	}
 

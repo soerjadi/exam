@@ -17,6 +17,10 @@ import (
 
 	catRepo "github.com/soerjadi/exam/product_category/repository"
 	cateUsecase "github.com/soerjadi/exam/product_category/usecase"
+
+	oHttp "github.com/soerjadi/exam/order/delivery/http"
+	oRepo "github.com/soerjadi/exam/order/repository"
+	oUsecase "github.com/soerjadi/exam/order/usecase"
 )
 
 // RegisterRouter --
@@ -36,6 +40,10 @@ func RegisterRouter(router *mux.Router) *mux.Router {
 	productRepo := pRepo.NewPGProductRepository(conn)
 	productUsecase := pUsecase.NewProductUsecase(productRepo, timeout)
 	pHttp.NewProductHandler(router, productUsecase, catUscase, categoryUsecase)
+
+	orderRepo := oRepo.NewPGOrderRepository(conn)
+	orderUsecase := oUsecase.NewOrderUsecase(orderRepo, timeout)
+	oHttp.NewOrderHandler(router, orderUsecase, productUsecase)
 
 	return router
 }

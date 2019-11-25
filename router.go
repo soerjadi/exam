@@ -14,6 +14,9 @@ import (
 	cHttp "github.com/soerjadi/exam/category/delivery/http"
 	cRepo "github.com/soerjadi/exam/category/repository"
 	cUsecase "github.com/soerjadi/exam/category/usecase"
+
+	catRepo "github.com/soerjadi/exam/product_category/repository"
+	cateUsecase "github.com/soerjadi/exam/product_category/usecase"
 )
 
 // RegisterRouter --
@@ -23,13 +26,16 @@ func RegisterRouter(router *mux.Router) *mux.Router {
 	conn := database.RDB().DB()
 	timeout := time.Duration(utils.GetEnvInt("CONTEXT_TIMEOUT", 0)) * time.Second
 
-	productRepo := pRepo.NewPGProductRepository(conn)
-	productUsecase := pUsecase.NewProductUsecase(productRepo, timeout)
-	pHttp.NewProductHandler(router, productUsecase)
+	catRepo := catRepo.NewPGProductCategoryRepository(conn)
+	catUscase := cateUsecase.NewPCUsecase(catRepo, timeout)
 
 	categoryRepo := cRepo.NewPGCategoryRepository(conn)
 	categoryUsecase := cUsecase.NewCategoryUsecase(categoryRepo, timeout)
 	cHttp.NewCategoryHandler(router, categoryUsecase)
+
+	productRepo := pRepo.NewPGProductRepository(conn)
+	productUsecase := pUsecase.NewProductUsecase(productRepo, timeout)
+	pHttp.NewProductHandler(router, productUsecase, catUscase, categoryUsecase)
 
 	return router
 }

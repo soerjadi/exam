@@ -3,39 +3,47 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/soerjadi/exam/category"
 	"github.com/soerjadi/exam/models"
 	"github.com/soerjadi/exam/product"
+	cat "github.com/soerjadi/exam/product_category"
+	t "github.com/soerjadi/exam/types"
 	"github.com/soerjadi/exam/utils"
 )
 
 type newProduct struct {
-	Name string `json:"name"`
-	SKU  string `json:"sku"`
+	Name       string  `json:"name"`
+	SKU        string  `json:"sku"`
+	CategoryID []int64 `json:"category_id"`
 }
 
 type updateProductData struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-	SKU  string `json:"sku"`
+	ID         int64   `json:"id"`
+	Name       string  `json:"name"`
+	SKU        string  `json:"sku"`
+	CategoryID []int64 `json:"category_id"`
 }
 
 // ProductHandler represent the http handler for product
 type ProductHandler struct {
-	ProductUsecase product.Usecase
+	ProductUsecase    product.Usecase
+	ProductCatUsecase cat.Usecase
+	CategoryUsecase   category.Usecase
 }
 
 var logger = utils.LogBuilder(true)
 
 // NewProductHandler initialize product resource endpoint
-func NewProductHandler(router *mux.Router, usecase product.Usecase) *mux.Router {
+func NewProductHandler(router *mux.Router, usecase product.Usecase, catUsecase cat.Usecase, categoryUsecase category.Usecase) *mux.Router {
 	handler := &ProductHandler{
-		ProductUsecase: usecase,
+		ProductUsecase:    usecase,
+		ProductCatUsecase: catUsecase,
+		CategoryUsecase:   categoryUsecase,
 	}
 
 	p := router.PathPrefix("/v1/product").Subrouter()
@@ -76,6 +84,20 @@ func (h *ProductHandler) AddProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, catID := range newProduct.CategoryID {
+		cat := models.ProductCategory{
+			ProductID:  product.ID,
+			CategoryID: catID,
+		}
+
+		err = h.ProductCatUsecase.Create(ctx, &cat)
+
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	utils.JSON(w, http.StatusOK, product)
 
 }
@@ -98,6 +120,13 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		ctx = context.Background()
 	}
 
+	origProduct, err := h.ProductUsecase.GetByID(ctx, updateProduct.ID)
+
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, models.ErrNotFound.Error())
+		return
+	}
+
 	product := models.Product{
 		ID:   updateProduct.ID,
 		Name: updateProduct.Name,
@@ -105,6 +134,33 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.ProductUsecase.Update(ctx, &product)
+
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = h.ProductCatUsecase.DeleteByProductID(ctx, product.ID)
+
+	// Revert when get an error update link product category
+	if err != nil {
+		_ = h.ProductUsecase.Update(ctx, origProduct)
+		utils.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	for _, cat := range updateProduct.CategoryID {
+		cat := &models.ProductCategory{
+			ProductID:  updateProduct.ID,
+			CategoryID: cat,
+		}
+
+		err = h.ProductCatUsecase.Create(ctx, cat)
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, err.Error())
@@ -130,19 +186,42 @@ func (h *ProductHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product, err := h.ProductUsecase.GetByID(ctx, id)
+	cats := make([]*models.Category, 0)
 
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	utils.JSON(w, http.StatusOK, product)
+	pCats, err := h.ProductCatUsecase.GetByProductID(ctx, product.ID)
+
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	for _, pCat := range pCats {
+		cat, err := h.CategoryUsecase.GetByID(ctx, pCat.CategoryID)
+		if err != nil {
+			continue
+		}
+
+		cats = append(cats, cat)
+	}
+
+	result := t.Product{
+		ID:       product.ID,
+		Name:     product.Name,
+		SKU:      product.SKU,
+		Category: cats,
+	}
+
+	utils.JSON(w, http.StatusOK, result)
 }
 
 // CompareProduct detail product
 func (h *ProductHandler) CompareProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	fmt.Println(vars)
 	productID1, err := strconv.ParseInt(vars["id_1"], 0, 64)
 	if err != nil {
 		logger.Error(err)
@@ -233,6 +312,9 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		utils.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// escape error because there is no connection between product and category already
+	_ = h.ProductCatUsecase.DeleteByProductID(ctx, id)
 
 	utils.JSON(w, http.StatusOK, "success")
 }

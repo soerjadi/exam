@@ -12,12 +12,21 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gopkg.in/guregu/null.v3"
 
+	categoryMocks "github.com/soerjadi/exam/category/mocks"
 	"github.com/soerjadi/exam/models"
 	productHttp "github.com/soerjadi/exam/product/delivery/http"
 	"github.com/soerjadi/exam/product/mocks"
+	catMocks "github.com/soerjadi/exam/product_category/mocks"
 	"github.com/soerjadi/exam/utils"
 )
+
+type newProduct struct {
+	Name       string  `json:"name"`
+	SKU        string  `json:"sku"`
+	CategoryID []int64 `json:"category_id"`
+}
 
 func TestCreate(t *testing.T) {
 	mockProduct := models.Product{
@@ -25,13 +34,21 @@ func TestCreate(t *testing.T) {
 		SKU:  "sku",
 	}
 
+	inputProduct := newProduct{
+		Name:       mockProduct.Name,
+		SKU:        mockProduct.SKU,
+		CategoryID: []int64{int64(8), int64(88)},
+	}
+
 	tmpMockProduct := mockProduct
 	tmpMockProduct.ID = 0
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
 
 	mockUsecase.On("Create", mock.Anything, mock.AnythingOfType("*models.Product")).Return(nil)
+	mockCatUsecase.On("Create", mock.Anything, mock.AnythingOfType("*models.ProductCategory")).Return(nil)
 
-	j, err := json.Marshal(mockProduct)
+	j, err := json.Marshal(inputProduct)
 	assert.NoError(t, err)
 
 	req, err := http.NewRequest("POST", "/v1/product/add", strings.NewReader(string(j)))
@@ -40,7 +57,8 @@ func TestCreate(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
 	}
 
 	handler.AddProduct(rec, req)
@@ -57,6 +75,7 @@ func TestCreateFail(t *testing.T) {
 	tmpMockProduct := mockProduct
 	tmpMockProduct.ID = 0
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
 
 	mockUsecase.On("Create", mock.Anything, mock.AnythingOfType("*models.Product")).Return(models.ErrInternalServerError)
 
@@ -69,7 +88,8 @@ func TestCreateFail(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
 	}
 
 	handler.AddProduct(rec, req)
@@ -86,8 +106,12 @@ func TestUpdate(t *testing.T) {
 	}
 
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
+	mockCategoryUsecase := new(categoryMocks.Usecase)
 
+	mockUsecase.On("GetByID", mock.Anything, mock.AnythingOfType("int64")).Return(&mockProduct, nil)
 	mockUsecase.On("Update", mock.Anything, mock.AnythingOfType("*models.Product")).Return(nil)
+	mockCatUsecase.On("DeleteByProductID", mock.Anything, mock.AnythingOfType("int64")).Return(nil)
 
 	j, err := json.Marshal(mockProduct)
 	assert.NoError(t, err)
@@ -98,7 +122,9 @@ func TestUpdate(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
+		CategoryUsecase:   mockCategoryUsecase,
 	}
 
 	handler.UpdateProduct(rec, req)
@@ -123,10 +149,26 @@ func TestGetByID(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
+	mockCategoryUsecase := new(categoryMocks.Usecase)
 
 	id := mockProduct.ID
 
+	cats := make([]*models.ProductCategory, 0)
+	cats = append(cats, &models.ProductCategory{
+		ID:         1,
+		ProductID:  id,
+		CategoryID: int64(8),
+	})
+	category := models.Category{
+		ID:       8,
+		Name:     "category 8",
+		ParentID: null.NewInt(int64(0), true),
+	}
+
 	mockUsecase.On("GetByID", mock.Anything, id).Return(&mockProduct, nil)
+	mockCatUsecase.On("GetByProductID", mock.Anything, mock.AnythingOfType("int64")).Return(cats, nil)
+	mockCategoryUsecase.On("GetByID", mock.Anything, mock.AnythingOfType("int64")).Return(&category, nil)
 
 	req, err := http.NewRequest("GET", "/v1/product/detail?id="+strconv.FormatInt(id, 10), strings.NewReader(""))
 	assert.NoError(t, err)
@@ -134,7 +176,9 @@ func TestGetByID(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
+		CategoryUsecase:   mockCategoryUsecase,
 	}
 
 	handler.GetByID(rec, req)
@@ -152,6 +196,7 @@ func TestCompareProduct(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
 	compareProduct := []*models.Product{
 		&mockProduct1, &mockProduct2,
 	}
@@ -162,7 +207,8 @@ func TestCompareProduct(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id_1": strconv.FormatInt(mockProduct1.ID, 10), "id_2": strconv.FormatInt(mockProduct2.ID, 10)})
 
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
 	}
 
 	rec := httptest.NewRecorder()
@@ -180,13 +226,16 @@ func TestDeleteProduct(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockUsecase := new(mocks.Usecase)
+	mockCatUsecase := new(catMocks.Usecase)
 
 	mockUsecase.On("Delete", mock.Anything, mock.AnythingOfType("int64")).Return(nil)
+	mockCatUsecase.On("DeleteByProductID", mock.Anything, mock.AnythingOfType("int64")).Return(nil)
 
 	req, err := http.NewRequest("GET", "/v1/product/delete?id="+strconv.FormatInt(mockProduct.ID, 10), strings.NewReader(""))
 
 	handler := productHttp.ProductHandler{
-		ProductUsecase: mockUsecase,
+		ProductUsecase:    mockUsecase,
+		ProductCatUsecase: mockCatUsecase,
 	}
 
 	rec := httptest.NewRecorder()

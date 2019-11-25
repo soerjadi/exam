@@ -63,11 +63,11 @@ func (_m *Usecase) GetByProductID(ctx context.Context, id int64) ([]*models.Prod
 }
 
 // GetPriceByAmount provides a mock function with given fields: ctx, amount
-func (_m *Usecase) GetPriceByAmount(ctx context.Context, amount int) (*models.ProductPrice, error) {
+func (_m *Usecase) GetPriceByAmount(ctx context.Context, amount int64) (*models.ProductPrice, error) {
 	ret := _m.Called(ctx, amount)
 
 	var r0 *models.ProductPrice
-	if rf, ok := ret.Get(0).(func(context.Context, int) *models.ProductPrice); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *models.ProductPrice); ok {
 		r0 = rf(ctx, amount)
 	} else {
 		if ret.Get(0) != nil {
@@ -76,7 +76,7 @@ func (_m *Usecase) GetPriceByAmount(ctx context.Context, amount int) (*models.Pr
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
 		r1 = rf(ctx, amount)
 	} else {
 		r1 = ret.Error(1)

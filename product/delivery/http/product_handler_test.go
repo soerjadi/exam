@@ -19,6 +19,7 @@ import (
 	productHttp "github.com/soerjadi/exam/product/delivery/http"
 	"github.com/soerjadi/exam/product/mocks"
 	catMocks "github.com/soerjadi/exam/product_category/mocks"
+	price "github.com/soerjadi/exam/product_price/mocks"
 	"github.com/soerjadi/exam/utils"
 )
 
@@ -108,10 +109,12 @@ func TestUpdate(t *testing.T) {
 	mockUsecase := new(mocks.Usecase)
 	mockCatUsecase := new(catMocks.Usecase)
 	mockCategoryUsecase := new(categoryMocks.Usecase)
+	mockPriceUsecase := new(price.Usecase)
 
 	mockUsecase.On("GetByID", mock.Anything, mock.AnythingOfType("int64")).Return(&mockProduct, nil)
 	mockUsecase.On("Update", mock.Anything, mock.AnythingOfType("*models.Product")).Return(nil)
 	mockCatUsecase.On("DeleteByProductID", mock.Anything, mock.AnythingOfType("int64")).Return(nil)
+	mockPriceUsecase.On("DeleteByProductID", mock.Anything, mock.AnythingOfType("int64")).Return(nil)
 
 	j, err := json.Marshal(mockProduct)
 	assert.NoError(t, err)
@@ -125,6 +128,7 @@ func TestUpdate(t *testing.T) {
 		ProductUsecase:    mockUsecase,
 		ProductCatUsecase: mockCatUsecase,
 		CategoryUsecase:   mockCategoryUsecase,
+		PriceUsecase:      mockPriceUsecase,
 	}
 
 	handler.UpdateProduct(rec, req)

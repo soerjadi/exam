@@ -12,21 +12,29 @@ import (
 	"github.com/soerjadi/exam/models"
 	"github.com/soerjadi/exam/product"
 	cat "github.com/soerjadi/exam/product_category"
+	price "github.com/soerjadi/exam/product_price"
 	t "github.com/soerjadi/exam/types"
 	"github.com/soerjadi/exam/utils"
 )
 
+type productPrice struct {
+	Amount int64   `json:"amount"`
+	Price  float64 `json:"price"`
+}
+
 type newProduct struct {
-	Name       string  `json:"name"`
-	SKU        string  `json:"sku"`
-	CategoryID []int64 `json:"category_id"`
+	Name       string         `json:"name"`
+	SKU        string         `json:"sku"`
+	CategoryID []int64        `json:"category_id"`
+	Price      []productPrice `json:"price"`
 }
 
 type updateProductData struct {
-	ID         int64   `json:"id"`
-	Name       string  `json:"name"`
-	SKU        string  `json:"sku"`
-	CategoryID []int64 `json:"category_id"`
+	ID         int64          `json:"id"`
+	Name       string         `json:"name"`
+	SKU        string         `json:"sku"`
+	CategoryID []int64        `json:"category_id"`
+	Price      []productPrice `json:"price"`
 }
 
 // ProductHandler represent the http handler for product
@@ -34,6 +42,7 @@ type ProductHandler struct {
 	ProductUsecase    product.Usecase
 	ProductCatUsecase cat.Usecase
 	CategoryUsecase   category.Usecase
+	PriceUsecase      price.Usecase
 }
 
 var logger = utils.LogBuilder(true)
@@ -98,6 +107,21 @@ func (h *ProductHandler) AddProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for _, price := range newProduct.Price {
+		_price := models.ProductPrice{
+			Amount:    price.Amount,
+			Price:     price.Price,
+			ProductID: product.ID,
+		}
+
+		err = h.PriceUsecase.Create(ctx, &_price)
+
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	utils.JSON(w, http.StatusOK, product)
 
 }
@@ -149,6 +173,14 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = h.PriceUsecase.DeleteByProductID(ctx, product.ID)
+	// Revert when get an error update price
+	if err != nil {
+		_ = h.ProductUsecase.Update(ctx, origProduct)
+		utils.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	for _, cat := range updateProduct.CategoryID {
 		cat := &models.ProductCategory{
 			ProductID:  updateProduct.ID,
@@ -162,9 +194,19 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err != nil {
-		utils.Error(w, http.StatusBadRequest, err.Error())
-		return
+	for _, price := range updateProduct.Price {
+		_price := models.ProductPrice{
+			Amount:    price.Amount,
+			Price:     price.Price,
+			ProductID: product.ID,
+		}
+
+		err = h.PriceUsecase.Create(ctx, &_price)
+
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	utils.JSON(w, http.StatusOK, product)

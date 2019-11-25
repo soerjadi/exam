@@ -170,7 +170,7 @@ func (p *pgProductRepository) Delete(ctx context.Context, id int64) error {
 
 	res, err := stmt.ExecContext(ctx, id)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	rowsAffected, err := res.RowsAffected()

@@ -67,7 +67,7 @@ func TestGetByID(t *testing.T) {
 
 	query := "SELECT id, name, sku, created, updated FROM products WHERE id = \\?"
 
-	mock.ExpectQuery(query).WillReturnRows(rows)
+	mock.ExpectQuery(query).WithArgs(int64(1)).WillReturnRows(rows)
 	p := repository.NewPGProductRepository(db)
 
 	product, err := p.GetByID(context.TODO(), int64(1))

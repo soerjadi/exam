@@ -1,0 +1,25 @@
+version: "2.3"
+services: 
+  web:
+    image: go-exam
+    container_name: pos_management_api
+    ports:
+      - 9090:9090
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      - ./.env:/app/.env
+  postgres:
+    image: postgres
+    container_name: go-exam-postgres
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=exam
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=goexam
+    

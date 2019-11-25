@@ -219,7 +219,6 @@ func TestCompareProduct(t *testing.T) {
 	handler.CompareProduct(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	// assert.Equal(t, "", rec.Body)
 
 	mockUsecase.AssertExpectations(t)
 }

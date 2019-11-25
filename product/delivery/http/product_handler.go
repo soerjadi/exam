@@ -309,8 +309,8 @@ func (h *ProductHandler) SearchProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if offset == 0 {
-		offset = 10
+	if limit == 0 {
+		limit = 10
 	}
 
 	ctx := r.Context()
